@@ -1,4 +1,4 @@
--- PhuQuy Hub Ultimate - Cập nhật tab Treo Tiền (Auto Click chống AFK)
+-- PhuQuy Hub Ultimate V1 --
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
