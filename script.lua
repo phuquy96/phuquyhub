@@ -25,7 +25,7 @@ ESPContainer.Name = "ESPContainer"
 ESPContainer.Parent = ScreenGui
 
 -- ==========================================
--- HỆ THỐNG LƯU TRỮ FILE VĨNH VIỄN (GIỮ THỜI GIAN KHI TẮT MÁY)
+-- HỆ THỐNG LƯU TRỮ FILE VĨNH VIỄN & BLACKLIST KEY HẾT HẠN
 -- ==========================================
 local FileName = "PhuQuyHub_Session.json"
 
@@ -35,28 +35,46 @@ local function loadSavedSession()
             return HttpService:JSONDecode(readfile(FileName))
         end)
         if success and data then
+            if not data.ExpiredKeys then data.ExpiredKeys = {} end
             return data
         end
     end
-    return { Key = "", ExpireTime = 0 }
+    return { Key = "", ExpireTime = 0, ExpiredKeys = {} }
 end
 
-local function saveSession(key, expireTime)
+local function saveSession(key, expireTime, expiredList)
     if writefile then
         pcall(function()
             local data = HttpService:JSONEncode({
                 Key = key,
-                ExpireTime = expireTime
+                ExpireTime = expireTime,
+                ExpiredKeys = expiredList or {}
             })
             writefile(FileName, data)
         end)
     end
 end
 
-local function clearSession()
+local function clearSessionToExpired()
+    local currentData = loadSavedSession()
+    if currentData.Key ~= "" then
+        local found = false
+        for _, k in ipairs(currentData.ExpiredKeys) do
+            if k == currentData.Key then found = true break end
+        end
+        if not found then
+            table.insert(currentData.ExpiredKeys, currentData.Key)
+        end
+    end
+    
     if writefile then
         pcall(function()
-            writefile(FileName, HttpService:JSONEncode({ Key = "", ExpireTime = 0 }))
+            local data = HttpService:JSONEncode({
+                Key = "",
+                ExpireTime = 0,
+                ExpiredKeys = currentData.ExpiredKeys
+            })
+            writefile(FileName, data)
         end)
     end
 end
@@ -479,6 +497,16 @@ ConfirmBtn.MouseButton1Click:Connect(function()
         return
     end
 
+    -- KIỂM TRA XEM KEY NÀY ĐÃ TỪNG HẾT HẠN TRƯỚC ĐÓ CHƯA
+    local currentData = loadSavedSession()
+    for _, k in ipairs(currentData.ExpiredKeys) do
+        if k == userKey then
+            StatusText.TextColor3 = Color3.fromRGB(255, 50, 50)
+            StatusText.Text = "Key này đã hết hạn, không thể dùng lại!"
+            return
+        end
+    end
+
     StatusText.TextColor3 = Color3.fromRGB(255, 255, 0)
     StatusText.Text = "Đang xác thực Key..."
 
@@ -514,9 +542,10 @@ ConfirmBtn.MouseButton1Click:Connect(function()
             local expireTimestamp = os.time() + timeInSeconds
             getgenv().PhuQuySavedSession = {
                 Key = userKey,
-                ExpireTime = expireTimestamp
+                ExpireTime = expireTimestamp,
+                ExpiredKeys = currentData.ExpiredKeys
             }
-            saveSession(userKey, expireTimestamp)
+            saveSession(userKey, expireTimestamp, currentData.ExpiredKeys)
 
             task.wait(0.8)
             grantAccess()
@@ -556,8 +585,9 @@ task.spawn(function()
                 StatusText.Text = "Key đã hết hạn! Vui lòng nhập Key mới."
                 KeyGui.Enabled = true
                 KeyInfoText.Text = "Key : Đã hết hạn\nThời Gian : 00:00"
-                getgenv().PhuQuySavedSession = { Key = "", ExpireTime = 0 }
-                clearSession()
+                
+                clearSessionToExpired()
+                getgenv().PhuQuySavedSession = loadSavedSession()
             end
         end
     end
@@ -809,7 +839,6 @@ BoxColorBtn.MouseButton1Click:Connect(function()
     BoxColorBtn.TextColor3 = boxColor
 end)
 
--- [BỔ SUNG] Thanh kéo chỉnh độ dày Box trực tiếp
 local BoxThickContainer = Instance.new("Frame", tab2)
 BoxThickContainer.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
 BoxThickContainer.Size = UDim2.new(1, -10, 0, 50)
@@ -853,7 +882,6 @@ end)
 createToggleInTab(tab2, "Hiện Tên Người Chơi", true, function(state) nameEnabled = state end)
 createToggleInTab(tab2, "Line (Đường kẻ)", true, function(state) lineEnabled = state end)
 
--- [BỔ SUNG] Nút đổi màu Line trực tiếp
 local LineColorBtn = Instance.new("TextButton", tab2)
 LineColorBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
 LineColorBtn.Size = UDim2.new(1, -10, 0, 36)
@@ -873,7 +901,6 @@ LineColorBtn.MouseButton1Click:Connect(function()
     LineColorBtn.TextColor3 = lineColor
 end)
 
--- [BỔ SUNG] Thanh kéo chỉnh độ dày Line trực tiếp
 local LineThickContainer = Instance.new("Frame", tab2)
 LineThickContainer.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
 LineThickContainer.Size = UDim2.new(1, -10, 0, 50)
@@ -951,14 +978,12 @@ createToggleInTab(tab4, "Tối Ưu FPS (Boost)", false, function(state)
     end)
 end)
 
--- --- TAB 5: TREO TIỀN (AUTO CLICK LIÊN TỤC CHỐNG AFK) ---
+-- --- TAB 5: TREO TIỀN ---
 local treoTienEnabled = false
 createToggleInTab(tab5, "Bật Auto Click Treo Tiền (Chống AFK)", false, function(state)
     treoTienEnabled = state
     task.spawn(function()
         local vu = game:GetService("VirtualUser")
-        
-        -- Kích hoạt giả lập chống văng 15 phút khi Roblox Idle
         local idledConnection
         idledConnection = game:GetService("Players").LocalPlayer.Idled:Connect(function()
             if treoTienEnabled then
@@ -970,7 +995,6 @@ createToggleInTab(tab5, "Bật Auto Click Treo Tiền (Chống AFK)", false, fun
             end
         end)
 
-        -- Vòng lặp auto click màn hình liên tục mỗi 3 giây để game nhận diện đang thao tác
         while treoTienEnabled do
             pcall(function()
                 vu:Button1Down(Vector2.new(100, 100))
