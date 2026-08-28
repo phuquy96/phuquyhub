@@ -1,0 +1,192 @@
+-- [[ ONYX V67 - CITY PVP V3 SCRIPT (ULTRA FAST BLINK HEAL & INSTANT WEAPON SNAP) ]]
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+
+-- Xóa UI cũ nếu có
+if CoreGui:FindFirstChild("OnyxCityPVP") then
+    CoreGui.OnyxCityPVP:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "OnyxCityPVP"
+ScreenGui.Parent = CoreGui
+
+-- Main Menu Frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 220, 0, 280)
+MainFrame.Position = UDim2.new(0, 50, 0, 150)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Title.Text = "ONYX v67 - PVP V3"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 14
+Title.Font = Enum.Font.GothamBold
+Title.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = Title
+
+-- Nút thu gọn / mở nhanh menu (Có thể kéo thả)
+local ToggleMenuBtn = Instance.new("TextButton")
+ToggleMenuBtn.Size = UDim2.new(0, 40, 0, 40)
+ToggleMenuBtn.Position = UDim2.new(0, 10, 0, 100)
+ToggleMenuBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+ToggleMenuBtn.Text = "UI"
+ToggleMenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleMenuBtn.TextSize = 14
+ToggleMenuBtn.Font = Enum.Font.GothamBold
+ToggleMenuBtn.Draggable = true
+ToggleMenuBtn.Parent = ScreenGui
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(0, 20)
+ToggleCorner.Parent = ToggleMenuBtn
+
+local menuVisible = true
+ToggleMenuBtn.MouseButton1Click:Connect(function()
+    menuVisible = not menuVisible
+    MainFrame.Visible = menuVisible
+end)
+
+-- Cấu hình tính năng
+getgenv().Config = {
+    AutoAttack = false,
+    AutoHeal = false,
+    InfiniteMana = false,
+    AttackSpeed = 0.35, -- Tốc độ đánh Như Lai chuẩn nhịp
+}
+
+local function createButton(name, posY, configKey)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 190, 0, 35)
+    btn.Position = UDim2.new(0, 15, 0, posY)
+    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    btn.TextColor3 = Color3.fromRGB(255, 100, 100)
+    btn.Text = name .. ": OFF"
+    btn.TextSize = 12
+    btn.Font = Enum.Font.GothamSemibold
+    btn.Parent = MainFrame
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = btn
+
+    btn.MouseButton1Click:Connect(function()
+        Config[configKey] = not Config[configKey]
+        if Config[configKey] then
+            btn.Text = name .. ": ON"
+            btn.TextColor3 = Color3.fromRGB(100, 255, 100)
+            btn.BackgroundColor3 = Color3.fromRGB(30, 70, 30)
+        else
+            btn.Text = name .. ": OFF"
+            btn.TextColor3 = Color3.fromRGB(255, 100, 100)
+            btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        end
+    end)
+end
+
+createButton("Auto Đánh (Như Lai)", 55, "AutoAttack")
+createButton("Auto Heal (Băng Gạc)", 105, "AutoHeal")
+createButton("Hồi Mana Nhanh", 155, "InfiniteMana")
+
+local isBlinkingHeal = false
+
+-- 1. Auto Attack (Đấm liên tục, nhường nhịp cực ngắn khi đang chớp gạc heal)
+task.spawn(function()
+    while task.wait(Config.AttackSpeed) do
+        if Config.AutoAttack and not isBlinkingHeal then
+            pcall(function()
+                local backpack = LocalPlayer:FindFirstChild("Backpack")
+                local targetName = "Như Lai Thần Chưởng (Legendary)"
+                local weapon = Character:FindFirstChild(targetName) 
+                    or (backpack and backpack:FindFirstChild(targetName))
+
+                if weapon then
+                    if weapon.Parent == backpack then
+                        Humanoid:EquipTool(weapon)
+                    end
+                    weapon:Activate()
+                end
+            end)
+        end
+    end
+end)
+
+-- 2. Auto Heal (Cơ chế chớp nhoáng siêu tốc: Rút băng gạc -> Kích hoạt heal -> Trả lại tay Phật ngay lập tức trong tích tắc)
+task.spawn(function()
+    while task.wait(0.1) do
+        if Config.AutoHeal then
+            pcall(function()
+                if Humanoid.Health < Humanoid.MaxHealth and Humanoid.Health > 0 then
+                    isBlinkingHeal = true -- Bật cờ khóa tạm thời tiến trình đánh để tránh xung đột tool
+                    
+                    local backpack = LocalPlayer:FindFirstChild("Backpack")
+                    local healItem = (backpack and backpack:FindFirstChild("Băng Gạc")) 
+                        or Character:FindFirstChild("Băng Gạc")
+                    local targetName = "Như Lai Thần Chưởng (Legendary)"
+
+                    if healItem then
+                        -- Bước 1: Rút băng gạc ra tay cực nhanh
+                        if healItem.Parent == backpack then
+                            Humanoid:EquipTool(healItem)
+                        end
+                        healItem:Activate()
+                        
+                        -- Chờ một khoảng cực kỳ ngắn (đủ để game nhận lệnh bơm máu)
+                        task.wait(0.04)
+                        
+                        -- Bước 2: Trả lại tay Phật Đỏ ngay lập tức để không bị mất tầm đánh
+                        local weapon = (backpack and backpack:FindFirstChild(targetName)) 
+                            or Character:FindFirstChild(targetName)
+                        if weapon and weapon.Parent == backpack then
+                            Humanoid:EquipTool(weapon)
+                        end
+                    end
+                    
+                    isBlinkingHeal = false -- Mở khóa lại cho phép đánh tiếp bình thường
+                end
+            end)
+        end
+    end
+end)
+
+-- 3. Hồi Mana Nhanh
+task.spawn(function()
+    while RunService.RenderStepped:Wait() do
+        if Config.InfiniteMana then
+            pcall(function()
+                for _, obj in ipairs(Character:GetDescendants()) do
+                    if (obj:IsA("NumberValue") or obj:IsA("IntValue")) and (string.lower(obj.Name):find("mana") or string.lower(obj.Name):find("energy") or string.lower(obj.Name):find("stamina")) then
+                        obj.Value = 100
+                    end
+                end
+                local stats = LocalPlayer:FindFirstChild("PlayerStats") or LocalPlayer:FindFirstChild("Stats")
+                if stats then
+                    for _, obj in ipairs(stats:GetDescendants()) do
+                        if (obj:IsA("NumberValue") or obj:IsA("IntValue")) and (string.lower(obj.Name):find("mana") or string.lower(obj.Name):find("energy") or string.lower(obj.Name):find("stamina")) then
+                            obj.Value = 100
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+print("Onyx v67: Ultra Fast Blink Heal loaded successfully.")
